@@ -23,7 +23,7 @@ stage 'Build'
 node {
 	sh "./mvnw clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Psonar -DskipTests"
 	archive includes: '*.jar', excludes: '*-sources.jar'
-	step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
+	//step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
 	stash excludes: 'target/', includes: '**', name: 'source'
 }
 
@@ -41,7 +41,7 @@ parallel([
 					'''
 				sh 'sh -e scripts/runAcceptanceTests.sh'
 				archive includes: '*.jar', excludes: '*-sources.jar'
-				step([$class: 'JUnitResultArchiver', testResults: '**/test-results/*.xml'])
+				//step([$class: 'JUnitResultArchiver', testResults: '**/test-results/*.xml'])
 			}
 		}
 ])
