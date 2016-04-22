@@ -14,36 +14,34 @@
  * limitations under the License.
  */
 
-stage 'Checkout'
 node {
-	checkout scm
-}
 
-stage 'Build'
-node {
-	sh "./mvnw clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Psonar -DskipTests"
-	archive includes: '*.jar', excludes: '*-sources.jar'
-	//step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
-	stash excludes: 'target/', includes: '**', name: 'source'
-}
+	stage 'Checkout'
+		checkout scm
 
-parallel([
-		'Sonar': {
-			node {
-				unstash 'source'
-				sh './mvnw sonar:sonar  -DskipTests'
+
+	stage 'Build'
+		sh "./mvnw clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Psonar"
+		archive includes: '*.jar', excludes: '*-sources.jar'
+		//step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
+		stash excludes: 'target/', includes: '**', name: 'source'
+
+	parallel([
+			'Sonar': {
+				node {
+					unstash 'source'
+					//sh './mvnw sonar:sonar '
+					echo "Skipping sonar for now"
+				}
+			},
+			'E2E tests'   : {
+				node {
+					unstash 'source'
+					//sh 'sh -e scripts/runAcceptanceTests.sh'
+					echo 'Not running E2E cause docker-compose is not installed on slaves'
+					archive includes: '*.jar', excludes: '*-sources.jar'
+					//step([$class: 'JUnitResultArchiver', testResults: '**/test-results/*.xml'])
+				}
 			}
-		},
-		'E2E tests'   : {
-			node {
-				unstash 'source'
-//				sh '''
-//					echo -e "Killing all active containers"
-//					docker kill $(docker ps -a -q) &&
-//					'''
-				sh 'sh -e scripts/runAcceptanceTests.sh'
-				archive includes: '*.jar', excludes: '*-sources.jar'
-				//step([$class: 'JUnitResultArchiver', testResults: '**/test-results/*.xml'])
-			}
-		}
-])
+	])
+}
