@@ -21,18 +21,16 @@ node {
 
 stage 'Build'
 node {
-	sh "./mvnw clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Psonar"
+	sh "./mvnw clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Psonar -DskipTests"
 	archive includes: '*.jar', excludes: '*-sources.jar'
 	step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
 	stash excludes: 'target/', includes: '**', name: 'source'
 }
 
-checkpoint 'Build Completed'
-
 parallel([
 		'Sonar': {
 			unstash 'source'
-			node { sh './mvnw sonar:sonar' }
+			node { sh './mvnw sonar:sonar  -DskipTests' }
 		},
 		'E2E tests'   : {
 			node {
