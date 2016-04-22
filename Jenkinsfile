@@ -29,16 +29,18 @@ node {
 
 parallel([
 		'Sonar': {
-			unstash 'source'
-			node { sh './mvnw sonar:sonar  -DskipTests' }
+			node {
+				unstash 'source'
+				sh './mvnw sonar:sonar  -DskipTests'
+			}
 		},
 		'E2E tests'   : {
 			node {
 				unstash 'source'
-				sh '''
-					echo -e "Killing all active containers"
-					docker kill $(docker ps -a -q)
-					'''
+//				sh '''
+//					echo -e "Killing all active containers"
+//					docker kill $(docker ps -a -q) &&
+//					'''
 				sh 'sh -e scripts/runAcceptanceTests.sh'
 				archive includes: '*.jar', excludes: '*-sources.jar'
 				//step([$class: 'JUnitResultArchiver', testResults: '**/test-results/*.xml'])
