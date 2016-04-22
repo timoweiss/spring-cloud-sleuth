@@ -16,7 +16,9 @@
 
 stage 'Checkout'
 
-checkout scm
+node {
+	checkout scm
+}
 
 stage 'Build'
 
