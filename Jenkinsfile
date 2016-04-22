@@ -15,31 +15,34 @@
  */
 
 stage 'Checkout'
-
 node {
 	checkout scm
 }
 
 stage 'Build'
-
 node {
 	sh "./mvnw clean org.jacoco:jacoco-maven-plugin:prepare-agent install -Psonar"
-	step([$class: 'ArtifactArchiver', artifacts: '**/target/*.jar', fingerprint: true])
+	archive includes: '*.jar', excludes: '*-sources.jar'
 	step([$class: 'JUnitResultArchiver', testResults: '**/target/surefire-reports/TEST-*.xml'])
+	stash excludes: 'target/', includes: '**', name: 'source'
 }
+
+checkpoint 'Build Completed'
 
 parallel([
 		'Sonar': {
-			node { sh 'mvn sonar:sonar' }
+			unstash 'source'
+			node { sh './mvnw sonar:sonar' }
 		},
 		'E2E tests'   : {
 			node {
+				unstash 'source'
 				sh '''
 					echo -e "Killing all active containers"
 					docker kill $(docker ps -a -q)
 					'''
 				sh 'sh -e scripts/runAcceptanceTests.sh'
-				step([$class: 'ArtifactArchiver', artifacts: '**/build/libs/*.jar', fingerprint: true])
+				archive includes: '*.jar', excludes: '*-sources.jar'
 				step([$class: 'JUnitResultArchiver', testResults: '**/test-results/*.xml'])
 			}
 		}
