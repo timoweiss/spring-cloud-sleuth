@@ -30,8 +30,7 @@ node {
 			'Sonar': {
 				node {
 					unstash 'source'
-					//sh './mvnw sonar:sonar '
-					echo "Skipping sonar for now"
+					sh './mvnw sonar:sonar -Psonar -Dsonar.host.url=https://sonar.spring.io'
 				}
 			},
 			'E2E tests'   : {
