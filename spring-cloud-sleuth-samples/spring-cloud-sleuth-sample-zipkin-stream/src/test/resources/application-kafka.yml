@@ -1,0 +1,12 @@
+zipkin:
+  storage:
+    type: mem # default is inMemory
+spring:
+  cloud.stream:
+    defaultBinder: kafka
+    bindings.sleuth.binder: kafka
+  sleuth:
+    sampler:
+      percentage: 1.0
+spring.sleuth.stream.enabled: true
+spring.autoconfigure.exclude: org.springframework.cloud.stream.test.binder.TestSupportBinderAutoConfiguration
