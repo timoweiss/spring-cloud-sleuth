@@ -20,12 +20,19 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.cloud.sleuth.Span;
 import org.springframework.cloud.sleuth.Tracer;
 import org.springframework.cloud.sleuth.stream.SleuthSink;
+import org.springframework.cloud.sleuth.stream.SleuthSource;
 import org.springframework.cloud.sleuth.stream.Spans;
+import org.springframework.cloud.stream.binder.Binding;
+import org.springframework.cloud.stream.binder.ExtendedConsumerProperties;
+import org.springframework.cloud.stream.binder.ExtendedProducerProperties;
+import org.springframework.cloud.stream.binder.kafka.KafkaConsumerProperties;
+import org.springframework.cloud.stream.binder.kafka.KafkaProducerProperties;
 import org.springframework.cloud.stream.binder.kafka.config.KafkaBinderConfigurationProperties;
 import org.springframework.cloud.stream.test.junit.kafka.KafkaTestSupport;
 import org.springframework.context.annotation.Bean;
@@ -33,6 +40,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.MessageEndpoint;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import tools.AbstractIntegrationTest;
@@ -49,19 +57,42 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class ZipkinStreamKafkaTests extends AbstractIntegrationTest {
 
 	@ClassRule
-	public static KafkaTestSupport kafkaTestSupport = new KafkaTestSupport();
+	public static KafkaTestSupport kafkaTestSupport = new KafkaTestSupport(true);
+
+	KafkaTestBinder binder;
 
 	@Autowired Tracer tracer;
 	@Autowired SpanMessageListener spanMessageListener;
+	@Autowired @Qualifier(SleuthSink.INPUT) MessageChannel input;
+	@Autowired @Qualifier(SleuthSource.OUTPUT) MessageChannel output;
 
 	@Test
 	public void should_propagate_spans_to_zipkin() {
+		KafkaTestBinder binder = getBinder();
+		Binding<MessageChannel> producerBinding = binder.bindProducer("sleuth", output, createProducerProperties());
+		Binding<MessageChannel> consumerBinding = binder.bindConsumer("sleuth", "sleuth", input, createConsumerProperties());
 		Span span = tracer.createSpan("new_span");
-		span.tag(getRequiredBinaryAnnotationName(), "10131");
 
 		tracer.close(span);
 
 		await().until(() -> !spanMessageListener.spans.isEmpty());
+		producerBinding.unbind();
+		consumerBinding.unbind();
+	}
+
+	protected KafkaTestBinder getBinder() {
+		if (binder == null) {
+			binder = new KafkaTestBinder(kafkaTestSupport, new KafkaBinderConfigurationProperties());
+		}
+		return binder;
+	}
+
+	protected ExtendedConsumerProperties<KafkaConsumerProperties> createConsumerProperties() {
+		return new ExtendedConsumerProperties<>(new KafkaConsumerProperties());
+	}
+
+	protected ExtendedProducerProperties<KafkaProducerProperties> createProducerProperties() {
+		return new ExtendedProducerProperties<>(new KafkaProducerProperties());
 	}
 
 	@Override
