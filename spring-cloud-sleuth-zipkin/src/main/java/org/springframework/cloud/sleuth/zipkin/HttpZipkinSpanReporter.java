@@ -133,6 +133,10 @@ public final class HttpZipkinSpanReporter
 		HttpURLConnection connection = (HttpURLConnection) new URL(this.url).openConnection();
 		connection.setRequestMethod("POST");
 		connection.addRequestProperty("Content-Type", "application/json");
+
+		String basicAuth = "Bearer " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJydWlkIjoiNTc0NTViNDQ2MzZjNWU1YzNmMzdmMjYwIiwic3lzdGVtX2lkIjoiNTc0NTViNTU3NzM1NTA1YzNmMjM2MTUyIiwiYXBwX2lkIjoiNTc0NTViNjlkYmRhYjY1YzNmMmUxMzUxIiwiaWF0IjoxNDY0MTYzMTc3fQ.UMpU2tsRX4Yb5dxFGg4nsne7w89HRaff4BWagbpvdb4";
+		connection.setRequestProperty("Authorization", basicAuth);
+
 		if (this.compressionEnabled) {
 			connection.addRequestProperty("Content-Encoding", "gzip");
 			ByteArrayOutputStream gzipped = new ByteArrayOutputStream();
