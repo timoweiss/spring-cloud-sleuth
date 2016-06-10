@@ -32,6 +32,8 @@ public class ZipkinProperties {
 	private int flushInterval = 1;
 	private Compression compression = new Compression();
 
+	private String authentication = null;
+
 	public String getBaseUrl() {
 		return this.baseUrl;
 	}
@@ -62,6 +64,10 @@ public class ZipkinProperties {
 
 	public void setCompression(Compression compression) {
 		this.compression = compression;
+	}
+
+	public String getAuthentication() {
+		return this.authentication;
 	}
 
 	/** When enabled, spans are gzipped before sent to the zipkin server */
