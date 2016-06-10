@@ -56,6 +56,9 @@ public class TraceRestTemplateInterceptor extends AbstractTraceHttpRequestInterc
 		try {
 			return new TraceHttpResponse(this, execution.execute(request, body));
 		} catch (Exception e) {
+			if (log.isDebugEnabled()) {
+				log.debug("Exception occurred while trying to execute the request. Will close the span [" + currentSpan() + "]", e);
+			}
 			this.tracer.close(currentSpan());
 			throw e;
 		}

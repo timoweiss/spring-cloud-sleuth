@@ -23,8 +23,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.cloud.netflix.ribbon.SpringClientFactory;
 import org.springframework.cloud.sleuth.SpanInjector;
+import org.springframework.cloud.sleuth.TraceKeys;
 import org.springframework.cloud.sleuth.Tracer;
 import org.springframework.cloud.sleuth.autoconfig.TraceAutoConfiguration;
+import org.springframework.cloud.sleuth.instrument.web.HttpTraceKeysInjector;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -50,20 +52,21 @@ public class TraceZuulAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	public TracePreZuulFilter tracePreZuulFilter(Tracer tracer,
-			SpanInjector<RequestContext> spanInjector) {
-		return new TracePreZuulFilter(tracer, spanInjector);
+			SpanInjector<RequestContext> spanInjector, HttpTraceKeysInjector httpTraceKeysInjector) {
+		return new TracePreZuulFilter(tracer, spanInjector, httpTraceKeysInjector);
 	}
 
 	@Bean
 	public TraceRestClientRibbonCommandFactory traceRestClientRibbonCommandFactory(SpringClientFactory factory,
-			Tracer tracer, SpanInjector<HttpRequest.Builder> spanInjector) {
-		return new TraceRestClientRibbonCommandFactory(factory, tracer, spanInjector);
+			Tracer tracer, SpanInjector<HttpRequest.Builder> spanInjector, HttpTraceKeysInjector httpTraceKeysInjector) {
+		return new TraceRestClientRibbonCommandFactory(factory, tracer, spanInjector,
+				httpTraceKeysInjector);
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
-	public TracePostZuulFilter tracePostZuulFilter(Tracer tracer) {
-		return new TracePostZuulFilter(tracer);
+	public TracePostZuulFilter tracePostZuulFilter(Tracer tracer, TraceKeys traceKeys) {
+		return new TracePostZuulFilter(tracer, traceKeys);
 	}
 
 	@Bean

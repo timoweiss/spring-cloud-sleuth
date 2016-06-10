@@ -78,12 +78,10 @@ public class TraceWebAspect {
 	}
 
 	@Pointcut("@within(org.springframework.web.bind.annotation.RestController)")
-	private void anyRestControllerAnnotated() { // NOSONAR
-	}
+	private void anyRestControllerAnnotated() { }// NOSONAR
 
 	@Pointcut("@within(org.springframework.stereotype.Controller)")
-	private void anyControllerAnnotated() { // NOSONAR
-	}
+	private void anyControllerAnnotated() { } // NOSONAR
 
 	@Pointcut("execution(public java.util.concurrent.Callable *(..))")
 	private void anyPublicMethodReturningCallable() { } // NOSONAR

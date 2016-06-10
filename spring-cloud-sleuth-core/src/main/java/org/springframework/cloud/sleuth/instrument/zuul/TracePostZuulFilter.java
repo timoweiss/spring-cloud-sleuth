@@ -16,12 +16,18 @@
 
 package org.springframework.cloud.sleuth.instrument.zuul;
 
+import java.lang.invoke.MethodHandles;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.cloud.sleuth.Span;
+import org.springframework.cloud.sleuth.TraceKeys;
 import org.springframework.cloud.sleuth.Tracer;
 
 import com.netflix.zuul.ZuulFilter;
+import com.netflix.zuul.context.RequestContext;
 
-/**
+/**8
  * A post request {@link ZuulFilter} that publishes an event upon start of the filtering
  *
  * @author Dave Syer
@@ -29,10 +35,14 @@ import com.netflix.zuul.ZuulFilter;
  */
 public class TracePostZuulFilter extends ZuulFilter {
 
-	private final Tracer tracer;
+	private static final Log log = LogFactory.getLog(MethodHandles.lookup().lookupClass());
 
-	public TracePostZuulFilter(Tracer tracer) {
+	private final Tracer tracer;
+	private final TraceKeys traceKeys;
+
+	public TracePostZuulFilter(Tracer tracer, TraceKeys traceKeys) {
 		this.tracer = tracer;
+		this.traceKeys = traceKeys;
 	}
 
 	@Override
@@ -44,6 +54,11 @@ public class TracePostZuulFilter extends ZuulFilter {
 	public Object run() {
 		// TODO: the client sent event should come from the client not the filter!
 		getCurrentSpan().logEvent(Span.CLIENT_RECV);
+		if (log.isDebugEnabled()) {
+			log.debug("Closing current client span " + getCurrentSpan() + "");
+		}
+		this.tracer.addTag(this.traceKeys.getHttp().getStatusCode(),
+				String.valueOf(RequestContext.getCurrentContext().getResponse().getStatus()));
 		this.tracer.close(getCurrentSpan());
 		return null;
 	}

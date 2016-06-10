@@ -16,13 +16,14 @@
 
 package org.springframework.cloud.sleuth.instrument.web.client;
 
-import java.util.ArrayList;
+import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import com.netflix.loadbalancer.BaseLoadBalancer;
 import com.netflix.loadbalancer.ILoadBalancer;
@@ -36,35 +37,41 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.BasicErrorController;
+import org.springframework.boot.autoconfigure.web.ErrorAttributes;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.WebIntegrationTest;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
 import org.springframework.cloud.netflix.ribbon.RibbonClient;
+import org.springframework.cloud.sleuth.Log;
 import org.springframework.cloud.sleuth.Sampler;
 import org.springframework.cloud.sleuth.Span;
 import org.springframework.cloud.sleuth.SpanReporter;
 import org.springframework.cloud.sleuth.Tracer;
 import org.springframework.cloud.sleuth.sampler.AlwaysSampler;
 import org.springframework.cloud.sleuth.trace.TestSpanContextHolder;
+import org.springframework.cloud.sleuth.util.ArrayListSpanAccumulator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit4.rules.SpringClassRule;
 import org.springframework.test.context.junit4.rules.SpringMethodRule;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 
 import static junitparams.JUnitParamsRunner.$;
+import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.BDDAssertions.then;
 import static org.springframework.cloud.sleuth.assertions.SleuthAssertions.then;
 
@@ -78,13 +85,15 @@ public class WebClientTests {
 
 	@Autowired TestFeignInterface testFeignInterface;
 	@Autowired @LoadBalanced RestTemplate template;
-	@Autowired Listener listener;
+	@Autowired ArrayListSpanAccumulator listener;
 	@Autowired Tracer tracer;
+	@Autowired TestErrorController testErrorController;
 
 	@After
 	public void close() {
 		TestSpanContextHolder.removeCurrentSpan();
 		this.listener.getSpans().clear();
+		this.testErrorController.clear();
 	}
 
 	@Test
@@ -194,6 +203,34 @@ public class WebClientTests {
 						.getForEntity("http://fooservice/noresponse", String.class));
 	}
 
+	@Test
+	public void shouldCloseSpanWhenErrorControllerGetsCalled() {
+		try {
+			this.template.getForEntity("http://fooservice/nonExistent", String.class);
+			fail("An exception should be thrown");
+		} catch (HttpClientErrorException e) { }
+
+		then(this.tracer.getCurrentSpan()).isNull();
+		Optional<Span> storedSpan = this.listener.getSpans().stream()
+				.filter(span -> "404".equals(span.tags().get("http.status_code"))).findFirst();
+		then(storedSpan.isPresent()).isTrue();
+		this.listener.getSpans().stream()
+				.forEach(span -> {
+					int initialSize = span.logs().size();
+					int distinctSize = span.logs().stream().map(Log::getEvent).distinct().collect(Collectors.toList()).size();
+					then(initialSize).as("there are no duplicate log entries").isEqualTo(distinctSize);
+				});
+		then(this.testErrorController.getSpan()).isNotNull();
+	}
+
+	@Test
+	public void shouldNotExecuteErrorControllerWhenUrlIsFound() {
+		this.template.getForEntity("http://fooservice/notrace", String.class);
+
+		then(this.tracer.getCurrentSpan()).isNull();
+		then(this.testErrorController.getSpan()).isNull();
+	}
+
 	private void thenRegisteredClientSentAndReceivedEvents(Span span) {
 		then(span).hasLoggedAnEvent(Span.CLIENT_RECV);
 		then(span).hasLoggedAnEvent(Span.CLIENT_SEND);
@@ -234,11 +271,6 @@ public class WebClientTests {
 			return new FooController();
 		}
 
-		@Bean
-		Listener listener() {
-			return new Listener();
-		}
-
 		@LoadBalanced
 		@Bean
 		public RestTemplate restTemplate() {
@@ -249,19 +281,41 @@ public class WebClientTests {
 		Sampler testSampler() {
 			return new AlwaysSampler();
 		}
+
+		@Bean
+		TestErrorController testErrorController(ErrorAttributes errorAttributes, Tracer tracer) {
+			return new TestErrorController(errorAttributes, tracer);
+		}
+
+		@Bean
+		SpanReporter spanReporter() {
+			return new ArrayListSpanAccumulator();
+		}
 	}
 
-	@Component
-	public static class Listener implements SpanReporter {
-		private List<Span> events = new ArrayList<>();
+	public static class TestErrorController extends BasicErrorController {
 
-		public List<Span> getSpans() {
-			return this.events;
+		private final Tracer tracer;
+
+		Span span;
+
+		public TestErrorController(ErrorAttributes errorAttributes, Tracer tracer) {
+			super(errorAttributes, new ServerProperties().getError());
+			this.tracer = tracer;
 		}
 
 		@Override
-		public void report(Span span) {
-			this.events.add(span);
+		public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
+			this.span = this.tracer.getCurrentSpan();
+			return super.error(request);
+		}
+
+		public Span getSpan() {
+			return this.span;
+		}
+
+		public void clear() {
+			this.span = null;
 		}
 	}
 

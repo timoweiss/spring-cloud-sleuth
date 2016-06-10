@@ -15,7 +15,6 @@
  */
 package org.springframework.cloud.sleuth.instrument.web;
 
-import java.util.Random;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
@@ -30,6 +29,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.embedded.FilterRegistrationBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.sleuth.SpanInjector;
 import org.springframework.cloud.sleuth.SpanExtractor;
@@ -41,6 +41,12 @@ import org.springframework.cloud.sleuth.autoconfig.TraceAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
+
+import static javax.servlet.DispatcherType.ASYNC;
+import static javax.servlet.DispatcherType.ERROR;
+import static javax.servlet.DispatcherType.FORWARD;
+import static javax.servlet.DispatcherType.INCLUDE;
+import static javax.servlet.DispatcherType.REQUEST;
 
 /**
  * {@link org.springframework.boot.autoconfigure.EnableAutoConfiguration Auto-configuration}
@@ -72,7 +78,17 @@ public class TraceWebAutoConfiguration {
 	}
 
 	@Bean
-	@ConditionalOnMissingBean
+	public FilterRegistrationBean traceWebFilter(Tracer tracer, TraceKeys traceKeys,
+			SkipPatternProvider skipPatternProvider, SpanReporter spanReporter,
+			SpanExtractor<HttpServletRequest> spanExtractor,
+			SpanInjector<HttpServletResponse> spanInjector,
+			HttpTraceKeysInjector httpTraceKeysInjector, TraceFilter traceFilter) {
+		FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(traceFilter);
+		filterRegistrationBean.setDispatcherTypes(ASYNC, ERROR, FORWARD, INCLUDE, REQUEST);
+		return filterRegistrationBean;
+	}
+
+	@Bean
 	public TraceFilter traceFilter(Tracer tracer, TraceKeys traceKeys,
 			SkipPatternProvider skipPatternProvider, SpanReporter spanReporter,
 			SpanExtractor<HttpServletRequest> spanExtractor,
@@ -83,9 +99,9 @@ public class TraceWebAutoConfiguration {
 	}
 
 	@Bean
-	public SpanExtractor<HttpServletRequest> httpServletRequestSpanExtractor(Random random,
+	public SpanExtractor<HttpServletRequest> httpServletRequestSpanExtractor(
 			SkipPatternProvider skipPatternProvider) {
-		return new HttpServletRequestExtractor(random, skipPatternProvider.skipPattern());
+		return new HttpServletRequestExtractor(skipPatternProvider.skipPattern());
 	}
 
 	@Bean
