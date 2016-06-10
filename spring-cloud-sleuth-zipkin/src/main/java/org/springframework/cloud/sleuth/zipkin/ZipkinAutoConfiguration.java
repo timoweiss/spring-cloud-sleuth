@@ -54,7 +54,7 @@ public class ZipkinAutoConfiguration {
 	@ConditionalOnMissingBean
 	public ZipkinSpanReporter reporter(SpanMetricReporter spanMetricReporter, ZipkinProperties zipkin) {
 		return new HttpZipkinSpanReporter(zipkin.getBaseUrl(), zipkin.getFlushInterval(),
-				zipkin.getCompression().isEnabled(), spanMetricReporter);
+				zipkin.getCompression().isEnabled(), spanMetricReporter, zipkin.getAuthentication());
 	}
 
 	@Bean
