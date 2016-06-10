@@ -38,6 +38,7 @@ public final class HttpZipkinSpanReporter
 	private static final Charset UTF_8 = Charset.forName("UTF-8");
 
 	private final String url;
+	private final String auth;
 	private final BlockingQueue<Span> pending = new LinkedBlockingQueue<>(1000);
 	private final Flusher flusher; // Nullable for testing
 	private final boolean compressionEnabled;
@@ -50,8 +51,11 @@ public final class HttpZipkinSpanReporter
 	 * @param spanMetricReporter service to count number of accepted / dropped spans
 	 */
 	public HttpZipkinSpanReporter(String baseUrl, int flushInterval, boolean compressionEnabled,
-			SpanMetricReporter spanMetricReporter) {
+			SpanMetricReporter spanMetricReporter, String auth) {
 		this.url = baseUrl + (baseUrl.endsWith("/") ? "" : "/") + "api/v1/spans";
+		this.auth = "Bearer " + auth;
+
+
 		this.flusher = flushInterval > 0 ? new Flusher(this, flushInterval) : null;
 		this.compressionEnabled = compressionEnabled;
 		this.spanMetricReporter = spanMetricReporter;
@@ -134,8 +138,9 @@ public final class HttpZipkinSpanReporter
 		connection.setRequestMethod("POST");
 		connection.addRequestProperty("Content-Type", "application/json");
 
-		String basicAuth = "Bearer " + "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJydWlkIjoiNTc0NTViNDQ2MzZjNWU1YzNmMzdmMjYwIiwic3lzdGVtX2lkIjoiNTc0NTViNTU3NzM1NTA1YzNmMjM2MTUyIiwiYXBwX2lkIjoiNTc0NTViNjlkYmRhYjY1YzNmMmUxMzUxIiwiaWF0IjoxNDY0MTYzMTc3fQ.UMpU2tsRX4Yb5dxFGg4nsne7w89HRaff4BWagbpvdb4";
-		connection.setRequestProperty("Authorization", basicAuth);
+		if(this.auth != null) {
+			connection.setRequestProperty("Authorization", this.auth);
+		}
 
 		if (this.compressionEnabled) {
 			connection.addRequestProperty("Content-Encoding", "gzip");
